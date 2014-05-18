@@ -1,0 +1,13 @@
+Ensemble:
+Area Under the Curve for Precision - Recall is 0.7077614727818636
+Area Under the Curve for ROC is 0.9524142383661897
+Number 1 WeightedProfile :
+Area Under the Curve for Precision - Recall is 0.6006175890150439
+Area Under the Curve for ROC is 0.886039465869686
+Number 2 NBI :
+Area Under the Curve for Precision - Recall is 0.6126909651580853
+Area Under the Curve for ROC is 0.8254053681246047
+Number 3 LapRLS :
+Area Under the Curve for Precision - Recall is 0.4691876366317148
+Area Under the Curve for ROC is 0.9562598616778742
+Number 4 GaussianKernel :
