@@ -461,7 +461,8 @@ class CrossValidation {
 //		System.out.print("real:" + sum(realSerial) + "pred:" + sum(predSerial));
 		
 		for (int i = 1; i < length; i++) {
-			if (Math.abs(realSerial[i - 1] - 1.0) < 1e-4)
+//			if (Math.abs(realSerial[i - 1] - 1.0) < 1e-4)
+			if ((realSerial[i - 1] - 1.0) < 1e-4)
 //			if (realSerial[i - 1]  == 1)
 				count = count - 1;
 			else
