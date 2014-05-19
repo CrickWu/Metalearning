@@ -65,7 +65,8 @@ public class RLSKron {
 //		System.out.println(F.get(0, 0) + " " + F.get(0, 1));
 	}
 	private Matrix computeKron(Matrix Kd, Matrix Kt, Matrix Y) {
-		EigenvalueDecomposition eigD = Kd.eig(), eigT = Kt.eig();
+		EigenvalueDecomposition eigD = Kd.eig();
+		EigenvalueDecomposition eigT = Kt.eig();
 		double[] ld = eigD.getRealEigenvalues(),
 				lt = eigT.getRealEigenvalues();
 		// manually computation of the new l matrix

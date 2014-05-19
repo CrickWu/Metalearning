@@ -139,11 +139,14 @@ class CrossValidation {
 	// The first dimension i represents the i-th method.
 	// The second dimension j represents the j-th matrix in the 10-fold cross-validation.
 	// Namely in each round of 10-fold cross-validation, method i gives 10 score matrices, labeled from F[i][0] to F[i][9].
-	int size = 4; // There are totally 5 methods incorporated in our meta approach.
+	int size = 5; // There are totally 5 methods incorporated in our meta approach.
 	int foldNum = 10; // 10-fold cross-validation.
 	Matrix F[][] = new Matrix[size][foldNum];
 	Matrix Y, drugSim, targetSim;
 	Matrix integrate;
+	
+	// the matrix that base learner can see
+	Matrix Y0;
 	
 	double realNum;
 	
@@ -217,7 +220,7 @@ class CrossValidation {
 				if (app1[totalSet[i][j][0]][totalSet[i][j][1]] == 1) 
 					app2[totalSet[i][j][0]][totalSet[i][j][1]] = 0;
 			}
-			Matrix Y0 = new Matrix(m, n);
+			Y0 = new Matrix(m, n);
 			for(int p = 0; p < m; p++)
 				for (int q = 0; q < n; q++)
 					Y0.set(p, q, app2[p][q]);
@@ -237,29 +240,36 @@ class CrossValidation {
 //			printMatrix(weight);
 			
 			//calculate realNum
-			double[][] YArray = Y.getArray();
+			double[][] YArray = Y0.getArray();
 			realNum = 0;
 			for (int p = 0; p < m; p++)
 				for (int q = 0; q < n; q++)
 					realNum += YArray[p][q];
+			System.out.print(realNum + " ");
 			
 //			System.out.println("-----"+realNum+"-----");
 			//alpha 
 			double[] alpha = new double[size];
+//			System.out.print(sum(weight) + " ");
+			
 			WeightedProfile wm = new WeightedProfile(Y0, weight, drugSim, targetSim);	
 			alpha[0] = updateWeight(wm.F, weight);
+//			System.out.print(sum(weight) + " ");
 			
 			NBI nm = new NBI(Y0, weight, drugSim, targetSim);
 			alpha[1] = updateWeight(nm.F, weight);
+//			System.out.print(sum(weight) + " ");
 			
 			LapRLS lm = new LapRLS(Y0, weight, drugSim, targetSim);
 			alpha[2] = updateWeight(lm.F, weight);
+//			System.out.print(sum(weight) + " ");
 			
 			GaussianKernel km = new GaussianKernel(Y0, weight, drugSim, targetSim);	
 			alpha[3] = updateWeight(km.F, weight);
+			System.out.print(sum(weight) + " ");
+			System.out.println();
 			
 //			RLSKron rm = new RLSKron(Y0, weight, drugSim, targetSim);
-//			System.out.println("RLSKron finished");
 //			alpha[4] = updateWeight(rm.F, weight);
 			
 			F[0][i] = wm.F;
@@ -269,7 +279,7 @@ class CrossValidation {
 //			F[4][i] = rm.F;
 			
 			integrate = F[0][i].times(alpha[0]);
-			for (int p = 1; p < size; p++)
+			for (int p = 1; p < size - 1; p++)
 				integrate = integrate.plus(F[p][i].times(alpha[p]));
 			
 			
@@ -279,13 +289,13 @@ class CrossValidation {
 			lm = new LapRLS(Y0, Y0, drugSim, targetSim);
 			km = new GaussianKernel(Y0, Y0, drugSim, targetSim);	
 			
-//			rm = new RLSKron(Y0, weight, drugSim, targetSim);
+			RLSKron rm = new RLSKron(Y0, Y0, drugSim, targetSim);
 			
 			F[0][i] = wm.F;
 			F[1][i] = nm.F;
 			F[2][i] = lm.F;
 			F[3][i] = km.F;
-//			F[4][i] = rm.F;
+			F[4][i] = rm.F;
 		}
 	}
 	
@@ -405,6 +415,15 @@ class CrossValidation {
 		return sum;
 	}
 	
+	public double sum(Matrix ma) {
+		double[][] maArray = ma.getArray();
+		double sum = 0;
+		for (int i = 0; i < ma.getRowDimension(); i++)
+			for (int j = 0; j < ma.getColumnDimension(); j++)
+				sum += maArray[i][j];
+		return sum;
+	}
+	
 	/**
 	 * @return double[0] alpha, double[1] cutoff*/
 	public double[] classifyError(double[][] pred) {
@@ -412,7 +431,7 @@ class CrossValidation {
 		int length = predSerial.length;
 //		System.out.println("length" + length);
 //		double[] errArray = new double[length];
-		double[] realSerial = serilize(Y);
+		double[] realSerial = serilize(Y0);
 		
 //		System.out.print("real:" + sum(realSerial) + "pred:" + sum(predSerial));
 		
@@ -428,6 +447,12 @@ class CrossValidation {
 //			count += realSerial[i];
 		count = realNum;
 		
+		//TODO the meaning of err is ``right value''
+		// that's why we need to finally let the prediction be the absolute value
+		// since we actually decrease the weight of the wrong prediction
+		
+		//TODO but NaN should not appear in this situation
+		
 		double err = count;
 		// for value ">=" cutoff, predict true
 		// in normal case, predict each instance to be false does not help improve "Accuracy"
@@ -437,6 +462,7 @@ class CrossValidation {
 		
 		for (int i = 1; i < length; i++) {
 			if (Math.abs(realSerial[i - 1] - 1.0) < 1e-4)
+//			if (realSerial[i - 1]  == 1)
 				count = count - 1;
 			else
 				count = count + 1;
@@ -445,7 +471,7 @@ class CrossValidation {
 				cutoffIndex = i;
 			}
 		}
-//		System.out.println(" err:" + err + " index:" + cutoffIndex);
+		System.out.println(" err:" + err + " index:" + cutoffIndex);
 		err = err / length;
 		double alpha = 0.5 * Math.log((1 - err) / err);
 		
@@ -481,7 +507,7 @@ class CrossValidation {
 	
 	
 	public double updateWeight(Matrix ma, Matrix weight) {
-		double[][] YArray = Y.getArray();
+		double[][] YArray = Y0.getArray();
 		double[][] maArray = ma.getArray();
 		double[][] weightArray = weight.getArray();
 		int m = ma.getRowDimension();
@@ -512,7 +538,8 @@ class CrossValidation {
 			for (int j = 0; j < n; j++)
 				sum += weightArray[i][j];
 		
-		double totalFactor = realNum + (m * n - realNum) / (m * n);
+//		double totalFactor = realNum + (m * n - realNum) / (m * n);
+		double totalFactor = realNum - (m * n - realNum) / (m * n);
 		// normalize
 		for (int i = 0; i < m; i++)
 			for (int j = 0; j < n; j++)
