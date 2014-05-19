@@ -6,7 +6,8 @@ import Jama.Matrix;
 
 // Input: (Y, Sd, St).
 // m: # of drugs. n: # of target proteins.
-// Y(m * n) is the DTI adjacency matrix.
+// Y0(m * n) is the DTI adjacency matrix.
+// weight(m * n) is the DTI weight matrix.
 // Sd(m * m) is the drug similarity matrix.
 // St(n * n) is the target protein similarity matrix.
 
@@ -16,8 +17,9 @@ class GaussianKernel {
 	
 	Matrix F;
 	
-	GaussianKernel (Matrix Y, Matrix Sd, Matrix St) { 
+	GaussianKernel (Matrix Y0, Matrix weight, Matrix Sd, Matrix St) { 
 //		System.out.println();
+		Matrix Y = CrossValidation.pairwiseProduct(Y0, weight);
 		int m = Y.getRowDimension();
 		int n = Y.getColumnDimension();
 		Matrix K_GIP_d = new Matrix(m, m);

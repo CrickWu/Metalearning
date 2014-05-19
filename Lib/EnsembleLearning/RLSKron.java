@@ -5,7 +5,8 @@ import Jama.*;
 
 //Input: (Y, Sd, St). ---> Here Sd and St are not used.
 //m: # of drugs. n: # of target proteins.
-//Y(m * n) is the DTI adjacency matrix.
+//Y0(m * n) is the DTI adjacency matrix.
+//weight(m * n) is the DTI weight matrix.
 //Sd(m * m) is the drug similarity matrix.
 //St(n * n) is the target protein similarity matrix.
 
@@ -24,7 +25,9 @@ public class RLSKron {
 	private double sigma = 1.0;
 	private double gammaD, gammaT;
 	
-	RLSKron(Matrix Y, Matrix Sd, Matrix St) {
+	RLSKron(Matrix Y0, Matrix weight, Matrix Sd, Matrix St) {
+		
+		Matrix Y = CrossValidation.pairwiseProduct(Y0, weight);
 		
 		m = Y.getRowDimension();
 		n = Y.getColumnDimension();

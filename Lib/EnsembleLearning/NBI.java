@@ -16,7 +16,9 @@ class NBI {
 	
 	Matrix F;
 	
-	NBI (Matrix Y, Matrix Sd, Matrix St) {
+	NBI (Matrix Y0, Matrix weight, Matrix Sd, Matrix St) {
+		Matrix Y = CrossValidation.pairwiseProduct(Y0, weight);
+		
 		int m = Y.getRowDimension();
 		int n = Y.getColumnDimension();
 		double[] kd = new double[m];

@@ -16,7 +16,9 @@ class WeightedProfile {
 	
 	Matrix F;
 	
-	WeightedProfile (Matrix Y, Matrix Sd, Matrix Sp) {
+	WeightedProfile (Matrix Y0, Matrix weight, Matrix Sd, Matrix Sp) {
+		Matrix Y = CrossValidation.pairwiseProduct(Y0, weight);
+		
 		int m = Y.getRowDimension();
 		int n = Y.getColumnDimension();
 		F = new Matrix(m, n);

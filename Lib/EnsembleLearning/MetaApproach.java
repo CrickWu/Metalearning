@@ -139,12 +139,12 @@ class CrossValidation {
 	// The first dimension i represents the i-th method.
 	// The second dimension j represents the j-th matrix in the 10-fold cross-validation.
 	// Namely in each round of 10-fold cross-validation, method i gives 10 score matrices, labeled from F[i][0] to F[i][9].
-	int size = 5; // There are totally 4 methods incorporated in our meta approach.
+	int size = 4; // There are totally 5 methods incorporated in our meta approach.
 	int foldNum = 10; // 10-fold cross-validation.
 	Matrix F[][] = new Matrix[size][foldNum];
 	Matrix Y, drugSim, targetSim;
+	Matrix integrate;
 	
-//	double[] serialY;
 	double realNum;
 	
 	// totalSet: We divide the dataset of DTIs randomly into 10 small sets, from totalSet[0] to totalSet[9], in nearly equal size.
@@ -157,7 +157,6 @@ class CrossValidation {
 	
 	CrossValidation (Matrix Adj, Matrix Sd, Matrix St) throws IOException {
 		Y = Adj;
-//		Y = transferMatrix(Adj);
 		drugSim = Sd;
 		targetSim = St;
 		Initialization();
@@ -223,38 +222,84 @@ class CrossValidation {
 				for (int q = 0; q < n; q++)
 					Y0.set(p, q, app2[p][q]);
 			
-			
-			WeightedProfile wm = new WeightedProfile(Y0, drugSim, targetSim);	
-			NBI nm = new NBI(Y0, drugSim, targetSim);
-			LapRLS lm = new LapRLS(Y0, drugSim, targetSim);
-			GaussianKernel km = new GaussianKernel(Y0, drugSim, targetSim);	
-			RLSKron rm = new RLSKron(Y0, drugSim, targetSim);
-			
-			F[0][i] = wm.F;
-			F[1][i] = nm.F;
-			F[2][i] = lm.F;
-			F[3][i] = km.F;	
-			F[4][i] = rm.F;
+//			the initial array is all 1's
+			/*
+			double[][] weightArray = new double[m][n];
+			for (int p = 0; p < m; p++)
+				for (int q = 0; q < n; q++)
+					// change of weight
+//					weightArray[p][q] = 1.0 / (m * n);
+					weightArray[p][q] = 1.0;
+			Matrix weight = new Matrix(weightArray);*/
 			
 			//Adaboost test
-//			serialY = serilize(Y);
+			Matrix weight = transferMatrix(Y0);
+//			printMatrix(weight);
 			
+			//calculate realNum
 			double[][] YArray = Y.getArray();
 			realNum = 0;
 			for (int p = 0; p < m; p++)
 				for (int q = 0; q < n; q++)
 					realNum += YArray[p][q];
+			
+//			System.out.println("-----"+realNum+"-----");
+			//alpha 
+			double[] alpha = new double[size];
+			WeightedProfile wm = new WeightedProfile(Y0, weight, drugSim, targetSim);	
+			alpha[0] = updateWeight(wm.F, weight);
+			
+			NBI nm = new NBI(Y0, weight, drugSim, targetSim);
+			alpha[1] = updateWeight(nm.F, weight);
+			
+			LapRLS lm = new LapRLS(Y0, weight, drugSim, targetSim);
+			alpha[2] = updateWeight(lm.F, weight);
+			
+			GaussianKernel km = new GaussianKernel(Y0, weight, drugSim, targetSim);	
+			alpha[3] = updateWeight(km.F, weight);
+			
+//			RLSKron rm = new RLSKron(Y0, weight, drugSim, targetSim);
+//			System.out.println("RLSKron finished");
+//			alpha[4] = updateWeight(rm.F, weight);
+			
+			F[0][i] = wm.F;
+			F[1][i] = nm.F;
+			F[2][i] = lm.F;
+			F[3][i] = km.F;
+//			F[4][i] = rm.F;
+			
+			integrate = F[0][i].times(alpha[0]);
+			for (int p = 1; p < size; p++)
+				integrate = integrate.plus(F[p][i].times(alpha[p]));
+			
+			
+			// non-ada compare
+			wm = new WeightedProfile(Y0, Y0, drugSim, targetSim);	
+			nm = new NBI(Y0, Y0, drugSim, targetSim);
+			lm = new LapRLS(Y0, Y0, drugSim, targetSim);
+			km = new GaussianKernel(Y0, Y0, drugSim, targetSim);	
+			
+//			rm = new RLSKron(Y0, weight, drugSim, targetSim);
+			
+			F[0][i] = wm.F;
+			F[1][i] = nm.F;
+			F[2][i] = lm.F;
+			F[3][i] = km.F;
+//			F[4][i] = rm.F;
 		}
 	}
 	
 	// Write the information into files for cross-validation, including data-sets and test-sets.
 	void WriteToFiles() throws IOException {		
 		BufferedWriter bw2 = new BufferedWriter(new FileWriter("record.txt"));	
+		BufferedWriter bwi = new BufferedWriter(new FileWriter("test_int.txt"));
 		
 		for (int i = 0; i < foldNum; i++) {	
 
 			// Files of data-sets.
+			// all the written things are done through proper scaling of adaboost
 			BufferedWriter bw = new BufferedWriter(new FileWriter("data"+i+".txt"));
+			
 			for (int j = 0; j < foldNum; j++) {
 				if (i == j) continue;
 				for (int k = 0; k < sizeSet[j]; k++) {
@@ -272,6 +317,7 @@ class CrossValidation {
 			
 			// Files of test-sets.
 			bw = new BufferedWriter(new FileWriter("test"+i+".txt"));
+			
 			for (int j = 0; j < sizeSet[i]; j++) {
 				int x = totalSet[i][j][0], y = totalSet[i][j][1];
 				if (Y.get(x, y) == 1) bw2.write("1");
@@ -280,19 +326,40 @@ class CrossValidation {
 //				bw.write("0");
 				if (Y.get(x, y) == 1) bw.write("1");
 				else bw.write("0");
-
+				
 				for (int l = 0; l < size; l++) {
 					int l2 = l + 1;
 					bw.write(" "+l2+":"+F[l][i].get(x, y));
 				}
 				bw.newLine();
+				
+				// abs?
+				bwi.write(Math.abs(integrate.get(x, y)) + " ");
+				if (Y.get(x, y) == 1) bwi.write("1");
+				else bwi.write("0");
+				bwi.newLine();
 			}
 			bw.close();
 	
 		}			
-		bw2.close();		
+		bw2.close();
+		bwi.close();
 	}
-	public static Matrix transferMatrix(Matrix ma) {
+	public static Matrix pairwiseProduct(Matrix a, Matrix b) {
+		double[][] aArray = a.getArray();
+		double[][] bArray = b.getArray();
+		int n = a.getColumnDimension();
+		int m = a.getRowDimension();
+		
+		double[][] retArray = new double[m][n];
+		
+		for (int i = 0; i < m; i++)
+			for (int j = 0; j < n; j++)
+				retArray[i][j] = aArray[i][j] * bArray[i][j];
+		return new Matrix(retArray);
+	}
+	
+	public Matrix transferMatrix(Matrix ma) {
 		int m = ma.getRowDimension();
 		int n = ma.getColumnDimension();
 		double[][] tArray = new double[m][n];
@@ -301,9 +368,10 @@ class CrossValidation {
 		for (int i = 0; i < m; i++)
 			for (int j = 0; j < n; j++)
 				if (maArray[i][j] == 1)
+					
 					tArray[i][j] = 1;
 				else
-					tArray[i][j] = -1;
+					tArray[i][j] = -1.0 / (m * n);
 		Matrix tMatrix = new Matrix(tArray);
 		return tMatrix;
 	}
@@ -328,7 +396,13 @@ class CrossValidation {
 			for (int j = 0; j < n; j++)
 				ret[i * n + j] = YArray[i][j];
 		return ret;
-		
+	}
+	
+	public double sum(double[] array) {
+		double sum = 0;
+		for (int i = 0; i < array.length; i++)
+			sum += array[i];
+		return sum;
 	}
 	
 	/**
@@ -336,9 +410,13 @@ class CrossValidation {
 	public double[] classifyError(double[][] pred) {
 		double[] predSerial = serilize(pred);
 		int length = predSerial.length;
-		double[] errArray = new double[length];
+//		System.out.println("length" + length);
+//		double[] errArray = new double[length];
 		double[] realSerial = serilize(Y);
-		qsort(predSerial, realSerial, 0, length);
+		
+//		System.out.print("real:" + sum(realSerial) + "pred:" + sum(predSerial));
+		
+		qsort(predSerial, realSerial, 0, length - 1);
 		// since the function only searches for the minError's cutoff
 		// we could assume each prediction value is different and we could get the optimal value
 		
@@ -355,9 +433,10 @@ class CrossValidation {
 		// in normal case, predict each instance to be false does not help improve "Accuracy"
 		// thus, we do not check this solution
 		int cutoffIndex = 0;
+//		System.out.print("real:" + sum(realSerial) + "pred:" + sum(predSerial));
 		
 		for (int i = 1; i < length; i++) {
-			if (realSerial[i] == 1)
+			if (Math.abs(realSerial[i - 1] - 1.0) < 1e-4)
 				count = count - 1;
 			else
 				count = count + 1;
@@ -366,12 +445,15 @@ class CrossValidation {
 				cutoffIndex = i;
 			}
 		}
+//		System.out.println(" err:" + err + " index:" + cutoffIndex);
 		err = err / length;
 		double alpha = 0.5 * Math.log((1 - err) / err);
 		
 		double[] retArray = {alpha, predSerial[cutoffIndex]};
+		return retArray;
 	}
 	
+	// why real does not hold the 
 	private void qsort(double[] array, double[] real, int s, int t) {
 		int i = s, j = t;
 		if (s >= t) return;
@@ -385,7 +467,7 @@ class CrossValidation {
 				i++;
 			}
 			while (array[i] < comp && i < j) i++;
-			if (i > j) {
+			if (i < j) {
 				array[j] = array[i];
 				real[j] = real[i];
 				j--;
@@ -397,14 +479,57 @@ class CrossValidation {
 		qsort(array, real, i + 1, t);
 	}
 	
-	public Matrix updateWeight(Matrix ma) {
+	
+	public double updateWeight(Matrix ma, Matrix weight) {
 		double[][] YArray = Y.getArray();
 		double[][] maArray = ma.getArray();
+		double[][] weightArray = weight.getArray();
 		int m = ma.getRowDimension();
 		int n = ma.getColumnDimension();
-		double[] retArray = classifyError(maArray);
+		double[] errArray = classifyError(maArray);
 		
-		double alpha = retArray[0];
+		double alpha = errArray[0];
 		// note for value ">=" cutoff, predict true
-		double cutoff = retArray[1];
+		double cutoff = errArray[1];
+		
+		double timesFactor = Math.exp(alpha);
+//		System.out.println("times:" + alpha);
+		
+		for (int i = 0; i < m; i++)
+			for (int j = 0; j < n; j++) {
+				// if predict true
+				if ((maArray[i][j] >= cutoff && YArray[i][j] == 1)
+						|| (maArray[i][j] < cutoff && YArray[i][j] != 1))
+					weightArray[i][j] *= timesFactor;
+				// if incorrect
+				else
+					weightArray[i][j] /= timesFactor;
+			}
+		
+		// calculate sum
+		double sum = 0.0;
+		for (int i = 0; i < m; i++)
+			for (int j = 0; j < n; j++)
+				sum += weightArray[i][j];
+		
+		double totalFactor = realNum + (m * n - realNum) / (m * n);
+		// normalize
+		for (int i = 0; i < m; i++)
+			for (int j = 0; j < n; j++)
+				weightArray[i][j] *= totalFactor / sum;
+		
+		return alpha;
+	}
+	
+	public static void printMatrix(Matrix ma) {
+		/*
+		double[][] maArray = ma.getArray();
+		for (int i = 0; i < maArray.length; i++) {
+			for (int j = 0; j < maArray[0].length; j++)
+				System.out.print(maArray[i][j] + " ");
+			System.out.println();
+		}
+		*/
+		System.out.println(ma.get(0, 0));
+	}
 }
