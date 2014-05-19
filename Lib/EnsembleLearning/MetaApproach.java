@@ -344,7 +344,8 @@ class CrossValidation {
 				bw.newLine();
 				
 				// abs?
-				bwi.write(Math.abs(integrate.get(x, y)) + " ");
+//				bwi.write(Math.abs(integrate.get(x, y)) + " ");
+				bwi.write((integrate.get(x, y)) + " ");
 				if (Y.get(x, y) == 1) bwi.write("1");
 				else bwi.write("0");
 				bwi.newLine();
@@ -457,12 +458,13 @@ class CrossValidation {
 		// for value ">=" cutoff, predict true
 		// in normal case, predict each instance to be false does not help improve "Accuracy"
 		// thus, we do not check this solution
+		// CHECKED
 		int cutoffIndex = 0;
 //		System.out.print("real:" + sum(realSerial) + "pred:" + sum(predSerial));
 		
-		for (int i = 1; i < length; i++) {
-//			if (Math.abs(realSerial[i - 1] - 1.0) < 1e-4)
-			if ((realSerial[i - 1] - 1.0) < 1e-4)
+		for (int i = 1; i < length + 1; i++) {
+			if (Math.abs(realSerial[i - 1] - 1.0) < 1e-4)
+//			if ((realSerial[i - 1] - 1.0) < 1e-4)
 //			if (realSerial[i - 1]  == 1)
 				count = count - 1;
 			else
@@ -472,11 +474,18 @@ class CrossValidation {
 				cutoffIndex = i;
 			}
 		}
+		err = length - err;
+		// make sure that alpha is not NaN
+		if (err < 1.1)
+			err = 1.0;
+		
 		System.out.println(" err:" + err + " index:" + cutoffIndex);
 		err = err / length;
 		double alpha = 0.5 * Math.log((1 - err) / err);
 		
-		double[] retArray = {alpha, predSerial[cutoffIndex]};
+		double cutoff = (cutoffIndex < length) ? predSerial[cutoffIndex] : predSerial[length - 1] + 0.0001; 
+		
+		double[] retArray = {alpha, cutoff};
 		return retArray;
 	}
 	
