@@ -115,6 +115,7 @@ public class MetaApproach {
 		Read3("Data/interaction_list_"+Class+".txt");
 	}
 	
+	//------------------------------Need Notice--------------------------------------------//
 	public static void main(String args[]) {
 		int classNum = (Integer.parseInt(args[0]));
 		MetaApproach meta = new MetaApproach();
@@ -139,15 +140,18 @@ class CrossValidation {
 	// The first dimension i represents the i-th method.
 	// The second dimension j represents the j-th matrix in the 10-fold cross-validation.
 	// Namely in each round of 10-fold cross-validation, method i gives 10 score matrices, labeled from F[i][0] to F[i][9].
-	int size = 5; // There are totally 5 methods incorporated in our meta approach.
+	int size = 3; // There are totally 5 methods incorporated in our meta approach.
+//	int size = 10; // There are totally 5 methods incorporated in our meta approach.
 	int foldNum = 10; // 10-fold cross-validation.
 	Matrix F[][] = new Matrix[size][foldNum];
 	Matrix Y, drugSim, targetSim;
-	Matrix integrate;
+	Matrix[] integrate = new Matrix[foldNum];
 	
 	// the matrix that base learner can see
 	Matrix Y0;
 	
+	// weight for positives and negatives
+	double pos, neg;
 	double realNum;
 	
 	// totalSet: We divide the dataset of DTIs randomly into 10 small sets, from totalSet[0] to totalSet[9], in nearly equal size.
@@ -169,6 +173,12 @@ class CrossValidation {
 	void Initialization() {
 		int m = Y.getRowDimension();
 		int n = Y.getColumnDimension();
+		
+		pos = 1.0;
+		neg = 1.0 / n;
+//		neg =1.0;
+//		neg = 1.0;
+		
 		int[][] app1 = new int[m][n];
 		int[][] app2 = new int[m][n];
 		int upSize = m * n / foldNum + 1;
@@ -185,6 +195,7 @@ class CrossValidation {
 			}
 		trueSize = trueSize / foldNum + 1;
 		
+		// divide the ``interacted'' information into 10 sets
 		for (int i = 0; i < m; i++)
 			for (int j = 0; j < n; j++) {
 				int ran;
@@ -198,6 +209,7 @@ class CrossValidation {
 				}
 			}
 		
+		// divide the ``non-interacted'' information into 10 sets
 		for (int i = 0; i < m; i++)
 			for (int j = 0; j < n; j++) {
 				int ran;
@@ -213,18 +225,22 @@ class CrossValidation {
 		
 		
 		for (int i = 0; i < foldNum; i++) { // totalSet[i] for the test.
+			// initialize each app2 (a copy)
 			for (int i1 = 0; i1 < m; i1++)
 				for (int i2 = 0; i2 < n; i2++)
 					app2[i1][i2] = app1[i1][i2];
+			// make the test be zero
 			for (int j = 0; j < sizeSet[i]; j++) {
 				if (app1[totalSet[i][j][0]][totalSet[i][j][1]] == 1) 
 					app2[totalSet[i][j][0]][totalSet[i][j][1]] = 0;
 			}
+			//construct Y0 from app2
 			Y0 = new Matrix(m, n);
 			for(int p = 0; p < m; p++)
 				for (int q = 0; q < n; q++)
 					Y0.set(p, q, app2[p][q]);
 			
+			//-------------------------------------------------
 //			the initial array is all 1's
 			/*
 			double[][] weightArray = new double[m][n];
@@ -236,6 +252,7 @@ class CrossValidation {
 			Matrix weight = new Matrix(weightArray);*/
 			
 			//Adaboost test
+			// Every time initialize a new visible Y0
 			Matrix weight = transferMatrix(Y0);
 //			printMatrix(weight);
 			
@@ -245,16 +262,40 @@ class CrossValidation {
 			for (int p = 0; p < m; p++)
 				for (int q = 0; q < n; q++)
 					realNum += YArray[p][q];
-			System.out.print(realNum + " ");
-			
 //			System.out.println("-----"+realNum+"-----");
 			//alpha 
 			double[] alpha = new double[size];
-//			System.out.print(sum(weight) + " ");
 			
+			// careful done with the (1/-1) and (1/0) prediction
+			//----------------------------------------------------
+			// adaboost of single-type baselearners
+//			/*
+//			Matrix mY = createMinus(Y0, 0);
+			Matrix mY = Y0.copy();
+			
+			for (int p = 0; p < size; p++) {
+				WeightedProfile wm = new WeightedProfile(mY, weight, drugSim, targetSim);
+				F[p][i] = wm.F;
+				alpha[p] = updateWeight(F[p][i], weight);
+//				alpha[p] = updateWeightByValue(F[p][i], weight);
+			}
+			
+			for (int p = 0; p < size; p++)
+				System.out.print(alpha[p] + " ");
+			System.out.println();
+			
+			integrate[i] = F[0][i].times(alpha[0]);
+			
+			for (int p = 1; p < size; p++)
+				integrate[i] = integrate[i].plus(F[p][i].times(alpha[p]));
+//				*/
+				
+			
+			//----------------------------------------------
+			/*
+//			System.out.print(sum(weight) + " ");
 			WeightedProfile wm = new WeightedProfile(Y0, weight, drugSim, targetSim);	
 			alpha[0] = updateWeight(wm.F, weight);
-//			System.out.print(sum(weight) + " ");
 			
 			NBI nm = new NBI(Y0, weight, drugSim, targetSim);
 			alpha[1] = updateWeight(nm.F, weight);
@@ -265,22 +306,23 @@ class CrossValidation {
 //			System.out.print(sum(weight) + " ");
 			
 			GaussianKernel km = new GaussianKernel(Y0, weight, drugSim, targetSim);	
+//			GKOriginal km = new GKOriginal(Y0, weight, drugSim, targetSim);	
 			alpha[3] = updateWeight(km.F, weight);
 			System.out.print(sum(weight) + " ");
 			System.out.println();
 			
-//			RLSKron rm = new RLSKron(Y0, weight, drugSim, targetSim);
-//			alpha[4] = updateWeight(rm.F, weight);
+			RLSKron rm = new RLSKron(Y0, weight, drugSim, targetSim);
+			alpha[4] = updateWeight(rm.F, weight);
 			
 			F[0][i] = wm.F;
 			F[1][i] = nm.F;
 			F[2][i] = lm.F;
 			F[3][i] = km.F;
-//			F[4][i] = rm.F;
+			F[4][i] = rm.F;
 			
-			integrate = F[0][i].times(alpha[0]);
+			integrate[i] = F[0][i].times(alpha[0]);
 			for (int p = 1; p < size - 1; p++)
-				integrate = integrate.plus(F[p][i].times(alpha[p]));
+				integrate[i] = integrate[i].plus(F[p][i].times(alpha[p]));
 			
 			
 			// non-ada compare
@@ -288,14 +330,20 @@ class CrossValidation {
 			nm = new NBI(Y0, Y0, drugSim, targetSim);
 			lm = new LapRLS(Y0, Y0, drugSim, targetSim);
 			km = new GaussianKernel(Y0, Y0, drugSim, targetSim);	
-			
-			RLSKron rm = new RLSKron(Y0, Y0, drugSim, targetSim);
+			rm = new RLSKron(Y0, Y0, drugSim, targetSim);
+			//TODO test with drugSim and targetSim destroyed
+			//The influence (the GKOriginal changes the similarity matrix and results in good AUPR)
+			//happens since each time the drugSim and targetSim is modified
+			//So that the next round the method could exploit the information modified by
+			//the method
+			//TODO PUZZLE SOLVED!!!!!!
 			
 			F[0][i] = wm.F;
 			F[1][i] = nm.F;
 			F[2][i] = lm.F;
 			F[3][i] = km.F;
 			F[4][i] = rm.F;
+			*/
 		}
 	}
 	
@@ -310,6 +358,7 @@ class CrossValidation {
 			// all the written things are done through proper scaling of adaboost
 			BufferedWriter bw = new BufferedWriter(new FileWriter("data"+i+".txt"));
 			
+			// print out all the totalSet[j != i] as the test set
 			for (int j = 0; j < foldNum; j++) {
 				if (i == j) continue;
 				for (int k = 0; k < sizeSet[j]; k++) {
@@ -330,11 +379,11 @@ class CrossValidation {
 			
 			for (int j = 0; j < sizeSet[i]; j++) {
 				int x = totalSet[i][j][0], y = totalSet[i][j][1];
-				if (Y.get(x, y) == 1) bw2.write("1");
+				if (Math.abs(Y.get(x, y) - 1) < 1e-4) bw2.write("1");
 				else bw2.write("0");
 				bw2.newLine();
 //				bw.write("0");
-				if (Y.get(x, y) == 1) bw.write("1");
+				if (Math.abs(Y.get(x, y) - 1) < 1e-4) bw.write("1");
 				else bw.write("0");
 				
 				for (int l = 0; l < size; l++) {
@@ -345,8 +394,8 @@ class CrossValidation {
 				
 				// abs?
 //				bwi.write(Math.abs(integrate.get(x, y)) + " ");
-				bwi.write((integrate.get(x, y)) + " ");
-				if (Y.get(x, y) == 1) bwi.write("1");
+				bwi.write(integrate[i].get(x, y) + " ");
+				if (Math.abs(Y.get(x, y) - 1) < 1e-4) bwi.write("1");
 				else bwi.write("0");
 				bwi.newLine();
 			}
@@ -370,6 +419,30 @@ class CrossValidation {
 		return new Matrix(retArray);
 	}
 	
+	public Matrix createMinus(Matrix ma, int para) {
+		int m = ma.getRowDimension();
+		int n = ma.getColumnDimension();
+		
+		double neg;
+		if (para == 1)
+			neg = -1.0;
+		else
+			neg = 1.0;
+		
+		double[][] tArray = new double[m][n];
+		double[][] maArray = ma.getArray();
+		
+		for (int i = 0; i < m; i++)
+			for (int j = 0; j < n; j++)
+				if (maArray[i][j] == 1)
+					
+					tArray[i][j] = 1;
+				else
+					tArray[i][j] = neg;
+		Matrix tMatrix = new Matrix(tArray);
+		return tMatrix;
+	}
+	
 	public Matrix transferMatrix(Matrix ma) {
 		int m = ma.getRowDimension();
 		int n = ma.getColumnDimension();
@@ -380,9 +453,9 @@ class CrossValidation {
 			for (int j = 0; j < n; j++)
 				if (maArray[i][j] == 1)
 					
-					tArray[i][j] = 1;
+					tArray[i][j] = pos;
 				else
-					tArray[i][j] = -1.0 / (m * n);
+					tArray[i][j] = neg;
 		Matrix tMatrix = new Matrix(tArray);
 		return tMatrix;
 	}
@@ -515,6 +588,19 @@ class CrossValidation {
 		qsort(array, real, i + 1, t);
 	}
 	
+	public double max(double[][] maArray) {
+		int m = maArray.length;
+		int n = maArray[0].length;
+		
+		double max = Double.MIN_VALUE;
+		
+		for (int i = 0; i < m; i++)
+			for (int j = 0; j < n; j++)
+				if (max < maArray[i][j])
+					max = maArray[i][j];
+		
+		return max;
+	}
 	
 	public double updateWeight(Matrix ma, Matrix weight) {
 		double[][] YArray = Y0.getArray();
@@ -531,8 +617,11 @@ class CrossValidation {
 		double timesFactor = Math.exp(alpha);
 //		System.out.println("times:" + alpha);
 		
+		double max = max(maArray);
+		
 		for (int i = 0; i < m; i++)
 			for (int j = 0; j < n; j++) {
+				/*
 				// if predict true
 				if ((maArray[i][j] >= cutoff && YArray[i][j] == 1)
 						|| (maArray[i][j] < cutoff && YArray[i][j] != 1))
@@ -540,6 +629,10 @@ class CrossValidation {
 				// if incorrect
 				else
 					weightArray[i][j] /= timesFactor;
+					*/
+				double tmp = 2 * YArray[i][j] - 1;
+				double predValue = 2 * maArray[i][j] / max - 1;
+				weightArray[i][j] *= Math.exp(-alpha * tmp * predValue);
 			}
 		
 		// calculate sum
@@ -548,8 +641,7 @@ class CrossValidation {
 			for (int j = 0; j < n; j++)
 				sum += weightArray[i][j];
 		
-//		double totalFactor = realNum + (m * n - realNum) / (m * n);
-		double totalFactor = realNum - (m * n - realNum) / (m * n);
+		double totalFactor = realNum * pos + (m * n - realNum) * neg;
 		// normalize
 		for (int i = 0; i < m; i++)
 			for (int j = 0; j < n; j++)
@@ -557,7 +649,59 @@ class CrossValidation {
 		
 		return alpha;
 	}
-	
+	// update the weight by the value of prediction (continueously)
+	public double updateWeightByValue(Matrix ma, Matrix weight) {
+		double[][] YArray = Y0.getArray();
+		double[][] maArray = ma.getArray();
+		double[][] weightArray = weight.getArray();
+		int m = ma.getRowDimension();
+		int n = ma.getColumnDimension();
+		
+		// regularize all the predictions to [0, 1]
+		double maxValue = Double.MIN_VALUE;
+		for (int i = 0; i < m; i++)
+			for (int j = 0; j < n; j++)
+				if (maxValue < maArray[i][j])
+					maxValue = maArray[i][j];
+		
+		// linear error
+		double err = 0;
+		for (int i = 0; i < m; i++)
+			for (int j = 0; j < n; j++) {
+				err += (YArray[i][j] == 0) ? maArray[i][j] / maxValue
+						: (1 - maArray[i][j] / maxValue);
+			}
+		
+		err = m * n - err;
+		err = err / (m * n);
+		System.out.println("Error: " + err);
+//		double alpha = 0.5 * Math.log((1 - err) / err);
+		double alpha = 0.5 * Math.log((1) / err);
+		
+		// [-1, 1] corresponds to Math.log(alpha * (maArray[i][j] / maxValue - 0.5) * 2)
+		double timesFactor = Math.log(alpha);
+		
+		for (int i = 0; i < m; i++)
+			for (int j = 0; j < n; j++) {
+				weightArray[i][j] *= Math.log(alpha * (maArray[i][j] / maxValue - 0.5) * 2);
+			}
+		
+		// calculate sum
+		double sum = 0.0;
+		for (int i = 0; i < m; i++)
+			for (int j = 0; j < n; j++)
+				sum += weightArray[i][j];
+
+		double totalFactor = realNum * pos + (m * n - realNum) * neg;
+		// normalize
+		for (int i = 0; i < m; i++)
+			for (int j = 0; j < n; j++)
+				weightArray[i][j] *= totalFactor / sum;
+				
+		
+		return alpha;
+				
+	}
 	public static void printMatrix(Matrix ma) {
 		/*
 		double[][] maArray = ma.getArray();

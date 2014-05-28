@@ -22,6 +22,42 @@ class LapRLS {
 		
 		int m = Y.getRowDimension();
 		int n = Y.getColumnDimension();
+		
+		Matrix K_GIP_d = new Matrix(m, m);
+		Matrix K_GIP_t = new Matrix(n, n);
+		double rd = 0, rt = 0;
+		for (int i = 0; i < m; i++) 
+			for (int j = 0; j < n; j++)
+				rd += Y.get(i, j);
+		rt = 1.0 * n / rd;
+		rd = 1.0 * m / rd;
+		for (int i = 0; i < m; i++)
+			for (int j = i; j < m; j++) {
+				if (i == j) K_GIP_d.set(i, j, 1);
+				else {
+					double delta = 0;
+					for (int k = 0; k < n; k++) 
+						delta += (Y.get(i, k) - Y.get(j, k)) * (Y.get(i, k) - Y.get(j, k));
+					K_GIP_d.set(i, j, Math.exp(-rd * delta));
+					K_GIP_d.set(j, i, Math.exp(-rd * delta));
+				}
+			}
+		for (int i = 0; i < n; i++)
+			for (int j = i; j < n; j++) {
+				if (i == j) K_GIP_t.set(i, j, 1);
+				else {
+					double delta = 0;
+					for (int k = 0; k < m; k++) 
+						delta += (Y.get(k, i) - Y.get(k, j)) * (Y.get(k, i) - Y.get(k, j));
+					K_GIP_t.set(i, j, Math.exp(-rt * delta));
+					K_GIP_t.set(j, i, Math.exp(-rt * delta));
+				}
+			}
+		double alpha = 0.5;
+		Matrix Wd = K_GIP_d.times(1 - alpha).plus(Sd.times(alpha));
+		Matrix Wp = K_GIP_t.times(1 - alpha).plus(Sp.times(alpha));
+
+		/*
 		Matrix Kd = new Matrix(m, m);
 		Matrix Kp = new Matrix(n, n);
 		for (int i = 0; i < m; i++)
@@ -41,6 +77,7 @@ class LapRLS {
 		double r1 = 1, r2 = 0.01;
 		Matrix Wd = Sd.times(r1).plus(Kd.times(r2)).times(1.0 / (r1 + r2));
 		Matrix Wp = Sp.times(r1).plus(Kp.times(r2)).times(1.0 / (r1 + r2));
+		*/
 		Matrix Dd = new Matrix(m, m, 0);
 		Matrix Dp = new Matrix(n, n, 0);
 		Matrix I1 = new Matrix(m, m, 0);

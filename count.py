@@ -3,7 +3,7 @@ import sys
 from string import *
 
 count = 0
-if len(sys.argv) > 2:
+if len(sys.argv) >= 2:
 	f = sys.argv[1]
 else:
 	f = '\t1'
