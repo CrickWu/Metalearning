@@ -1,2 +1,10 @@
+tmp
 null
 *.txt*
+*.spr
+*.pr
+*.roc
+*.class
+meta.jar
+Lib/ThreeNetworks/bin
+Result/
