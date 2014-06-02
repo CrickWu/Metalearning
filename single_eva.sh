@@ -19,4 +19,4 @@ do
 	echo 'Number' $pt ${array[$(($pt-1))]} ':'
 	tail -n 2 list$pt.txt
 done
-./ada_eva.sh
+#./ada_eva.sh

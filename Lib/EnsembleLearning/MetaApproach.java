@@ -110,6 +110,9 @@ public class MetaApproach {
 	void Initialization(int Class) throws IOException, FileNotFoundException {
 		drug.clear();
 		target.clear();
+//		Read1("../Data/drug_similarity_"+Class+".txt");
+//		Read2("../Data/target_similarity_"+Class+".txt");
+//		Read3("../Data/interaction_list_"+Class+".txt");
 		Read1("Data/drug_similarity_"+Class+".txt");
 		Read2("Data/target_similarity_"+Class+".txt");
 		Read3("Data/interaction_list_"+Class+".txt");
@@ -123,13 +126,23 @@ public class MetaApproach {
 			meta.Initialization(classNum);
 		} catch (IOException e) {
 			System.out.println("Error: IOException. Source files not found or other reasons.");
-		}		
+		}
+//		CrossValidation.printMatrix(meta.drugSim);
+		try {
+			DrugCrossValidation cv = new DrugCrossValidation(meta.adj, meta.drugSim, meta.targetSim);
+			cv.WriteToFiles();
+		} catch (IOException e) {
+			System.out.println("Error: IOException. Writing to files failed.");
+		}
+		
+		/*
 		try {
 			CrossValidation cv = new CrossValidation(meta.adj, meta.drugSim, meta.targetSim);
 			cv.WriteToFiles();
 		} catch (IOException e) {
 			System.out.println("Error: IOException. Writing to files failed.");
 		}
+		*/
 	}
 	
 }
@@ -703,14 +716,14 @@ class CrossValidation {
 				
 	}
 	public static void printMatrix(Matrix ma) {
-		/*
+		
 		double[][] maArray = ma.getArray();
 		for (int i = 0; i < maArray.length; i++) {
 			for (int j = 0; j < maArray[0].length; j++)
 				System.out.print(maArray[i][j] + " ");
 			System.out.println();
 		}
-		*/
-		System.out.println(ma.get(0, 0));
+		
+//		System.out.println(ma.get(0, 0));
 	}
 }
