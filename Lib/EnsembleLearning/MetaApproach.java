@@ -18,7 +18,7 @@ public class MetaApproach {
 	// Read the file of drug similarity scores.
 	void Read1(String src) throws IOException, FileNotFoundException {
 		BufferedReader br = new BufferedReader(new FileReader(src));
-		String pattern = "([A-Z][0-9]+)\\s";
+		String pattern = "([A-Z]+[0-9]+)\\s";
 		Pattern p = Pattern.compile(pattern);
 		String s = br.readLine();
 		Matcher m = p.matcher(s);
@@ -39,7 +39,8 @@ public class MetaApproach {
 				label++;
 			for (int j = 0;; j++) {
 				int x = label;
-				while (s.charAt(label) == '.' || (s.charAt(label) >= '0' && s.charAt(label) <= '9')) {
+//				while (s.charAt(label) == '.' || (s.charAt(label) >= '0' && s.charAt(label) <= '9')) {
+				while (s.charAt(label) != ' ') {
 					label++;
 					if (label >= s.length()) break;
 				}
@@ -49,13 +50,16 @@ public class MetaApproach {
 					label++;
 			}			
 		}
+		
+//		for (int i = 0; i < drugSize; i++)
+//			drugSim.set(i, i, 1.0);
 		br.close();
 	}
 	
 	// Read the file of target protein similarity scores.
 	void Read2(String src) throws IOException, FileNotFoundException { // target.
 		BufferedReader br = new BufferedReader(new FileReader(src));
-		String pattern = "hsa([0-9]+)\\s";
+		String pattern = "([A-Z]+[0-9]+)\\s";
 		Pattern p = Pattern.compile(pattern);
 		String s = br.readLine();
 		Matcher m = p.matcher(s);
@@ -70,13 +74,14 @@ public class MetaApproach {
 		for (int i = 0; i < targetSize; i++) {
 			s = br.readLine();
 			int label = 0;
-			while ((s.charAt(label) >= 'a' && s.charAt(label) <= 'z') || (s.charAt(label) >= '0' && s.charAt(label) <= '9')) 
+			while ((s.charAt(label) >= 'A' && s.charAt(label) <= 'Z') || (s.charAt(label) >= '0' && s.charAt(label) <= '9')) 
 				label++;
 			while (s.charAt(label) < '0' || s.charAt(label) > '9')
 				label++;
 			for (int j = 0;; j++) {
 				int x = label;
-				while (s.charAt(label) == '.' || (s.charAt(label) >= '0' && s.charAt(label) <= '9')) {
+//				while (s.charAt(label) == '.' || (s.charAt(label) >= '0' && s.charAt(label) <= '9')) {
+				while (s.charAt(label) != ' ') {
 					label++;
 					if (label >= s.length()) break;
 				}
@@ -86,6 +91,9 @@ public class MetaApproach {
 					label++;
 			}			
 		}
+		
+//		for (int i = 0; i < drugSize; i++)
+//			drugSim.set(i, i, 1.0);
 		br.close();
 	}
 	
@@ -93,7 +101,8 @@ public class MetaApproach {
 	void Read3(String src) throws IOException, FileNotFoundException {
 		adj = new Matrix(drugSize, targetSize, 0);
 		BufferedReader br = new BufferedReader(new FileReader(src));
-		String pattern = "hsa:([0-9]+)\\s*([A-Z][0-9]+)";
+//		String pattern = "hsa:([0-9]+)\\s*([A-Z]+[0-9]+)";
+		String pattern = "([A-Z]+[0-9]+)\\s*([A-Z]+[0-9]+)";
 		Pattern p = Pattern.compile(pattern);
 		String s;
 		while ((s = br.readLine()) != null) {
@@ -110,9 +119,9 @@ public class MetaApproach {
 	void Initialization(int Class) throws IOException, FileNotFoundException {
 		drug.clear();
 		target.clear();
-		Read1("Data/drug_similarity_"+Class+".txt");
-		Read2("Data/target_similarity_"+Class+".txt");
-		Read3("Data/interaction_list_"+Class+".txt");
+		Read1("Data/drug-drug/similarity.txt");
+		Read2("Data/drug-drug/similarity.txt");
+		Read3("Data/drug-drug/interaction.txt");
 	}
 	
 	//------------------------------Need Notice--------------------------------------------//
@@ -121,6 +130,7 @@ public class MetaApproach {
 		MetaApproach meta = new MetaApproach();
 		try {
 			meta.Initialization(classNum);
+//			CrossValidation.printMatrix(meta.adj);
 		} catch (IOException e) {
 			System.out.println("Error: IOException. Source files not found or other reasons.");
 		}		
@@ -140,7 +150,7 @@ class CrossValidation {
 	// The first dimension i represents the i-th method.
 	// The second dimension j represents the j-th matrix in the 10-fold cross-validation.
 	// Namely in each round of 10-fold cross-validation, method i gives 10 score matrices, labeled from F[i][0] to F[i][9].
-	int size = 3; // There are totally 5 methods incorporated in our meta approach.
+	int size = 5; // There are totally 5 methods incorporated in our meta approach.
 //	int size = 10; // There are totally 5 methods incorporated in our meta approach.
 	int foldNum = 10; // 10-fold cross-validation.
 	Matrix F[][] = new Matrix[size][foldNum];
@@ -269,7 +279,7 @@ class CrossValidation {
 			// careful done with the (1/-1) and (1/0) prediction
 			//----------------------------------------------------
 			// adaboost of single-type baselearners
-//			/*
+			/*
 //			Matrix mY = createMinus(Y0, 0);
 			Matrix mY = Y0.copy();
 			
@@ -288,12 +298,13 @@ class CrossValidation {
 			
 			for (int p = 1; p < size; p++)
 				integrate[i] = integrate[i].plus(F[p][i].times(alpha[p]));
-//				*/
+				*/
 				
 			
 			//----------------------------------------------
-			/*
+//			/*
 //			System.out.print(sum(weight) + " ");
+			/*
 			WeightedProfile wm = new WeightedProfile(Y0, weight, drugSim, targetSim);	
 			alpha[0] = updateWeight(wm.F, weight);
 			
@@ -308,11 +319,13 @@ class CrossValidation {
 			GaussianKernel km = new GaussianKernel(Y0, weight, drugSim, targetSim);	
 //			GKOriginal km = new GKOriginal(Y0, weight, drugSim, targetSim);	
 			alpha[3] = updateWeight(km.F, weight);
-			System.out.print(sum(weight) + " ");
-			System.out.println();
+			
+//			System.out.print(sum(weight) + " ");
+//			System.out.println();
 			
 			RLSKron rm = new RLSKron(Y0, weight, drugSim, targetSim);
 			alpha[4] = updateWeight(rm.F, weight);
+			
 			
 			F[0][i] = wm.F;
 			F[1][i] = nm.F;
@@ -323,14 +336,14 @@ class CrossValidation {
 			integrate[i] = F[0][i].times(alpha[0]);
 			for (int p = 1; p < size - 1; p++)
 				integrate[i] = integrate[i].plus(F[p][i].times(alpha[p]));
-			
+			*/
 			
 			// non-ada compare
-			wm = new WeightedProfile(Y0, Y0, drugSim, targetSim);	
-			nm = new NBI(Y0, Y0, drugSim, targetSim);
-			lm = new LapRLS(Y0, Y0, drugSim, targetSim);
-			km = new GaussianKernel(Y0, Y0, drugSim, targetSim);	
-			rm = new RLSKron(Y0, Y0, drugSim, targetSim);
+			WeightedProfile wm = new WeightedProfile(Y0, Y0, drugSim, targetSim);	
+			NBI nm = new NBI(Y0, Y0, drugSim, targetSim);
+			LapRLS lm = new LapRLS(Y0, Y0, drugSim, targetSim);
+			GaussianKernel km = new GaussianKernel(Y0, Y0, drugSim, targetSim);	
+			RLSKron rm = new RLSKron(Y0, Y0, drugSim, targetSim);
 			//TODO test with drugSim and targetSim destroyed
 			//The influence (the GKOriginal changes the similarity matrix and results in good AUPR)
 			//happens since each time the drugSim and targetSim is modified
@@ -342,8 +355,9 @@ class CrossValidation {
 			F[1][i] = nm.F;
 			F[2][i] = lm.F;
 			F[3][i] = km.F;
-			F[4][i] = rm.F;
-			*/
+//			F[4][i] = rm.F;
+			F[4][i] = drugSim.copy();
+//			*/
 		}
 	}
 	
@@ -392,12 +406,20 @@ class CrossValidation {
 				}
 				bw.newLine();
 				
+				bwi.write(drugSim.get(x, y) + " ");
+				if (Math.abs(Y.get(x, y) - 1) < 1e-4) bwi.write("1");
+				else bwi.write("0");
+				bwi.newLine();
+				
 				// abs?
 //				bwi.write(Math.abs(integrate.get(x, y)) + " ");
+				
+				/*
 				bwi.write(integrate[i].get(x, y) + " ");
 				if (Math.abs(Y.get(x, y) - 1) < 1e-4) bwi.write("1");
 				else bwi.write("0");
 				bwi.newLine();
+				*/
 			}
 			bw.close();
 	
@@ -552,7 +574,8 @@ class CrossValidation {
 		if (err < 1.1)
 			err = 1.0;
 		
-		System.out.println(" err:" + err + " index:" + cutoffIndex);
+//		System.out.println(" err:" + err + " index:" + cutoffIndex);
+		
 		err = err / length;
 		double alpha = 0.5 * Math.log((1 - err) / err);
 		
@@ -703,14 +726,14 @@ class CrossValidation {
 				
 	}
 	public static void printMatrix(Matrix ma) {
-		/*
+		
 		double[][] maArray = ma.getArray();
 		for (int i = 0; i < maArray.length; i++) {
 			for (int j = 0; j < maArray[0].length; j++)
 				System.out.print(maArray[i][j] + " ");
 			System.out.println();
 		}
-		*/
-		System.out.println(ma.get(0, 0));
+		
+//		System.out.println(ma.get(0, 0));
 	}
 }

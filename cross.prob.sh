@@ -51,4 +51,4 @@ echo 'Ensemble'$SEL':'
 tail -n 2 list.txt
 
 #./ada_eva.sh
-./single_eva.sh 3
+./single_eva.sh 5

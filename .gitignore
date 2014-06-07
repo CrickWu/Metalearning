@@ -1,10 +1,13 @@
 tmp
 null
-*.txt*
+/*.txt*
 *.spr
 *.pr
 *.roc
 *.class
 meta.jar
+Lib/ThreeNetworks/test
 Lib/ThreeNetworks/bin
 Result/
+Data/*.txt
+Data/.directory
